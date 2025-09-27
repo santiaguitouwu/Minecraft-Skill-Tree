@@ -8,7 +8,7 @@ function App() {
                 <div className={styles.shadow}>
                     <h1 className={styles.title}>Minecraft</h1>
                     <div className={styles.container}>
-                        <SkillTree />
+                        <SkillTree/>
                     </div>
                 </div>
             </div>
