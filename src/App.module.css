@@ -1,0 +1,38 @@
+.app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+.border {
+    border: 4px solid #3f3f3f;
+    border-radius: 12px;
+    background-color: #c6c6c6;
+}
+
+.shadow {
+    border-radius: 10px;
+    border-top: 4px solid #ffffff;
+    padding: 0 40px 30px 40px;
+}
+
+.title {
+    font-size: 24px;
+    font-weight: 200;
+    color: #3f3f3f;
+}
+
+.container {
+    min-width: calc(min(80vw, 800px) - 40px);
+    min-height: min(80vh, 400px);
+    display: flex;
+    align-items: start;
+    justify-content: start;
+    box-shadow:
+        -5px -5px 4px 0px rgba(0, 0, 0, 0.5) inset,
+        5px 5px 5px 0px rgba(0, 0, 0, 0.5) inset;
+    background: url('https://s3-alpha-sig.figma.com/img/5091/3e57/ffd8f463685a0ef9651b58644a44086b?Expires=1726444800&Key-Pair-Id=APKAQ4GOSFWCVNEHN3O4&Signature=RqSJiYtDQOvjtl8GsHmRLa21TUb2NYXd7LxIx6~1cktfPVoaYz66pnFUNvOJBYCbdunYYYTQOqqiSff1odukkiJEruzxGPOqlz4-3uojY-o7Om-5NwdTKrR3gHt7YU5Z9-1xOSEet~yWHyp1DIv6~EcpJLlRx~~s8OuPhLBKBq6krmOR~mKN-Lv6zeooK8dBgZ~HMiMGDlK1tqVpIgZmUKAWQmIDUZXaQz2QPIwx6UlNH7NTPutblDP1uG4lA0k0~2M1RJM13-LJIpwOz46t5zNF~z0a4EMqXjtiunJqmLb9bTdXZTKEQR~a3gOUIdx4C4IQLEuLZGzXuER~HV1Vqw__')
+        lightgray 50% / cover;
+}
