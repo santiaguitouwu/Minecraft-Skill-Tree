@@ -1,22 +1,26 @@
-/* SkillTree.module.css */
 .host {
     position: relative;
     width: 100%;
     height: 100%;
     overflow: hidden;
-
-    /* Fondo centrado */
-    background: url('/background.png') center center / cover no-repeat;
-    image-rendering: pixelated;
-
-    /* Centro el contenido (el “stage”) */
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
+.pannable {
+    cursor: grab;
+}
+
+.pannable:active {
+    cursor: grabbing;
+}
+
+
 .stage {
-    position: relative;
+   /* position: absolute;*/
+    left: 0;
+    top: 0;
     transform-origin: top left;
-    z-index: 1; /* por si el fondo superpone */
+    z-index: 1;
 }

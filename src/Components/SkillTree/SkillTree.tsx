@@ -1,5 +1,6 @@
 // src/Components/SkillTree/SkillTree.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     fetchSkillTree,
     selectCompleted,
@@ -13,14 +14,12 @@ import {
 import { useAppDispatch, useAppSelector } from '../../store';
 import styles from './SkillTree.module.css';
 
-const DEFAULT_URL = 'https://minecraft.capta.co/BaseSkillTree.json';
-
-const NODE_SIZE = 44;
-const H_GAP = 84;
-const V_GAP = 84;
+const NODE_SIZE = 52;
+const H_GAP = 80;
+const V_GAP = 64;
 const PADDING = 32;
 
-type PlacedNode = {
+interface PlacedNode {
     id: string;
     x: number;
     y: number;
@@ -31,7 +30,7 @@ type PlacedNode = {
     parentId: string | null;
     isCompleted: boolean;
     isUnlocked: boolean;
-};
+}
 
 export default function SkillTree() {
     const dispatch = useAppDispatch();
@@ -45,12 +44,16 @@ export default function SkillTree() {
     const [hoverId, setHoverId] = useState<string | null>(null);
 
     const hostRef = useRef<HTMLDivElement>(null);
+    const isPanningRef = useRef(false);
+    const lastRef = useRef<{ x: number; y: number } | null>(null);
+    const stageRef = useRef<HTMLDivElement>(null); // para portal
     const [hostSize, setHostSize] = useState({ w: 0, h: 0 });
 
+
     useEffect(() => {
-        const url = sourceUrl || DEFAULT_URL;
-        dispatch(fetchSkillTree(url));
-    }, [dispatch]);
+        if (!sourceUrl) return;
+        dispatch(fetchSkillTree(sourceUrl));
+    }, [dispatch, sourceUrl]);
 
     useEffect(() => {
         if (!hostRef.current) return;
@@ -65,135 +68,305 @@ export default function SkillTree() {
     const { placed, edges, naturalW, naturalH } = useMemo(() => {
         if (!rootId) return { placed: [], edges: [], naturalW: 400, naturalH: 300 };
 
-        const q: Array<{ id: string; depth: number; parentId: string | null }> = [
-            { id: rootId, depth: 0, parentId: null },
-        ];
+        // --- BFS: niveles (depth) y padres ---
+        const q: Array<{ id: string; depth: number }> = [{ id: rootId, depth: 0 }];
         const levels: Record<number, string[]> = {};
-        const parent: Record<string, string | null> = { [rootId]: null };
+        const parentOf: Record<string, string | null> = { [rootId]: null };
+        let maxDepth = 0;
 
         while (q.length) {
-            const cur = q.shift()!;
-            levels[cur.depth] ??= [];
-            levels[cur.depth].push(cur.id);
-            const node = entities[cur.id];
+            const { id, depth } = q.shift()!;
+            maxDepth = Math.max(maxDepth, depth);
+            (levels[depth] ??= []).push(id);
+            const node = entities[id];
             node.childrenIds.forEach((cid) => {
-                parent[cid] = cur.id;
-                q.push({ id: cid, depth: cur.depth + 1, parentId: cur.id });
+                parentOf[cid] = id;
+                q.push({ id: cid, depth: depth + 1 });
             });
         }
 
-        const depthCount = Object.keys(levels).length;
-        const maxPerColumn = Math.max(...Object.values(levels).map((arr) => arr.length));
+        // X por columna
+        const xAtDepth: Record<number, number> = {};
+        for (let d = 0; d <= maxDepth; d++) xAtDepth[d] = PADDING + d * H_GAP;
 
-        const naturalW = PADDING * 2 + (depthCount - 1) * H_GAP + NODE_SIZE;
-        const naturalH = PADDING * 2 + (maxPerColumn - 1) * V_GAP + NODE_SIZE;
+        // --- DFS estilo "tidy": filas según altura del subárbol ---
+        const childrenOf: Record<string, string[]> = {};
+        Object.keys(entities).forEach((id) => (childrenOf[id] = entities[id].childrenIds.slice()));
 
-        const coordMap: Record<string, { x: number; y: number; depth: number }> = {};
-        Object.entries(levels).forEach(([dStr, ids]) => {
-            const d = Number(dStr);
-            const x = PADDING + d * H_GAP;
+        const row: Record<string, number> = {};
+        let nextLeaf = 0;
 
-            const columnHeight = ids.length * NODE_SIZE + (ids.length - 1) * (V_GAP - NODE_SIZE);
-            const offsetY = (naturalH - columnHeight) / 2;
+        function assignRow(id: string) {
+            const kids = childrenOf[id];
+            if (!kids || kids.length === 0) {
+                row[id] = nextLeaf++;
+                return row[id];
+            }
 
-            ids.forEach((id, i) => {
-                const y = offsetY + i * V_GAP;
-                coordMap[id] = { x, y, depth: d };
-            });
-        });
+            // primero posiciona hijos (postorden)
+            kids.forEach(assignRow);
+            const sorted = kids.slice().sort((a, b) => row[a] - row[b]);
 
-        const placed: PlacedNode[] = Object.keys(coordMap).map((id) => {
-            const n = entities[id];
-            const p = parent[id];
-            const parentCompleted = p ? completed[p] : true;
+            if (sorted.length % 2 === 1) {
+                // impar: usa el hijo del medio
+                const mid = (sorted.length - 1) / 2;
+                row[id] = row[sorted[mid]];
+            } else {
+                // par: promedio de los del medio
+                const sum = sorted.reduce((acc, cid) => acc + row[cid], 0);
+                row[id] = sum / sorted.length;
+            }
+            return row[id];
+        }
+        assignRow(rootId);
+
+        const allRows = Object.values(row);
+        const minRow = Math.min(...allRows);
+        const maxRow = Math.max(...allRows);
+        const rowSpan = Math.max(0, maxRow - minRow);
+
+        // Y por fila normalizada
+        const yMap: Record<string, number> = {};
+        Object.keys(row).forEach((id) => (yMap[id] = PADDING + (row[id] - minRow) * V_GAP));
+
+        const naturalH = PADDING * 2 + rowSpan * V_GAP + NODE_SIZE;
+        const naturalW = PADDING * 2 + Math.max(0, ...Object.keys(levels).map(Number)) * H_GAP + NODE_SIZE;
+
+        // Construir placed[]
+        const placed: PlacedNode[] = Object.keys(entities).map((id) => {
+            // depth del nodo: buscar en levels
+            let d = 0;
+            while (levels[d] && !levels[d].includes(id)) d++;
             return {
                 id,
-                x: coordMap[id].x,
-                y: coordMap[id].y,
-                depth: coordMap[id].depth,
-                name: n.name,
-                description: n.description,
-                image: n.image,
-                parentId: p ?? null,
-                isCompleted: completed[id],
-                isUnlocked: parentCompleted,
+                x: xAtDepth[d] ?? PADDING,
+                y: yMap[id] ?? PADDING,
+                depth: d,
+                name: entities[id].name,
+                description: entities[id].description,
+                image: entities[id].image,
+                parentId: parentOf[id] ?? null,
+                isCompleted: !!completed[id],
+                isUnlocked: parentOf[id] ? !!completed[parentOf[id]!] : true,
             };
         });
+        placed.sort((a, b) => a.depth - b.depth || a.y - b.y);
 
+        // Edges (padre, hijo)
         const edges: [string, string][] = [];
         Object.values(entities).forEach((n) => n.childrenIds.forEach((cid) => edges.push([n.id, cid])));
 
         return { placed, edges, naturalW, naturalH };
     }, [entities, rootId, completed]);
 
+    // Escalado para ocupar el contenedor padre (se calcula SIEMPRE antes de cualquier return)
+    const canFit = naturalW > 0 && naturalH > 0 && hostSize.w > 0 && hostSize.h > 0;
+    const scaleX = canFit ? hostSize.w / naturalW : 1;
+    const scaleY = canFit ? hostSize.h / naturalH : 1;
+
+    const hovered = hoverId ? placed.find((p) => p.id === hoverId) : null;
+
+    // Posición del tooltip en pantalla (portal) — este hook también se evalúa SIEMPRE
+    const tooltipScreenPos = useMemo(() => {
+        if (!hovered || !stageRef.current) return null;
+
+        const r = stageRef.current.getBoundingClientRect();
+
+        // Tamaño del nodo en pantalla (con escala)
+        const nodeX = r.left + hovered.x * scaleX;
+        const nodeY = r.top  + hovered.y * scaleY;
+        const nodeW = NODE_SIZE * scaleX;
+        const nodeH = NODE_SIZE * scaleY;
+
+        // Tamaño aprox. del tooltip (cabecera + cuerpo)
+        const TT_W = 240;
+        const TT_H = 120; // si te queda corto/largo, ajusta este número
+
+        const GAP = 12;      // separación mínima respecto al nodo
+        const PAD = 8;       // margen a los bordes de la ventana
+
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        // Preferencia 1: DERECHA del nodo
+        let left = nodeX + nodeW + GAP;
+        let top  = nodeY; // alineado al top del nodo
+
+        const fitsRight = left + TT_W <= vw - PAD;
+        if (!fitsRight) {
+            // Preferencia 2: IZQUIERDA del nodo
+            left = nodeX - GAP - TT_W;
+            if (left < PAD) {
+                // Preferencia 3: ABAJO del nodo (centrado horizontal al nodo)
+                left = nodeX + nodeW / 2 - TT_W / 2;
+                top  = nodeY + nodeH + GAP;
+
+                const fitsBottom = top + TT_H <= vh - PAD;
+                if (!fitsBottom) {
+                    // Preferencia 4: ARRIBA del nodo
+                    top = nodeY - GAP - TT_H;
+                }
+            }
+        }
+
+        // Clamps suaves a los bordes
+        left = Math.min(Math.max(left, PAD), vw - PAD - TT_W);
+        top  = Math.min(Math.max(top,  PAD), vh - PAD - TT_H);
+
+        return { left, top, width: TT_W, height: TT_H };
+    }, [hovered, scaleX, scaleY]);
+
+    // --- Ahora sí, returns tempranos (después de todos los hooks) ---
     if (status === 'loading') return <p style={{ color: '#ccc' }}>Cargando árbol…</p>;
     if (status === 'failed') return <p style={{ color: 'tomato' }}>Error: {error}</p>;
     if (!rootId) return null;
 
-    const hovered = hoverId ? placed.find((p) => p.id === hoverId) : null;
+    const onPointerDown: React.PointerEventHandler<HTMLDivElement> = (e) => {
+        if (!hostRef.current) return;
+
+        // evita iniciar pan si haces click directo sobre un nodo (botón)
+        if ((e.target as HTMLElement).closest('button')) return;
+
+        isPanningRef.current = true;
+        lastRef.current = { x: e.clientX, y: e.clientY };
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        hostRef.current.classList.add(styles.panning);
+        e.preventDefault();
+    };
+
+    const onPointerMove: React.PointerEventHandler<HTMLDivElement> = (e) => {
+        if (!isPanningRef.current || !hostRef.current || !lastRef.current) return;
+        const dx = e.clientX - lastRef.current.x;
+        const dy = e.clientY - lastRef.current.y;
+        hostRef.current.scrollLeft -= dx;
+        hostRef.current.scrollTop  -= dy;
+        lastRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const endPan: React.PointerEventHandler<HTMLDivElement> = (e) => {
+        if (!hostRef.current) return;
+        isPanningRef.current = false;
+        lastRef.current = null;
+        hostRef.current.classList.remove(styles.panning);
+        (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    };
+
+    const canPan = naturalW > hostSize.w || naturalH > hostSize.h;
 
     return (
-        <div ref={hostRef} className={styles.host}>
+        <div ref={hostRef} className={`${styles.host} ${canPan ? styles.pannable : ''}`}>
             <div
+                ref={stageRef}
                 className={styles.stage}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endPan}
+                onPointerLeave={endPan}
+                onPointerCancel={endPan}
                 style={{
                     width: `${naturalW}px`,
                     height: `${naturalH}px`,
+                    transform: `scale(${scaleX}, ${scaleY})`,
+                    transformOrigin: 'top left',
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
                 }}
             >
+                {/* Conexiones con rail por padre */}
                 <svg width={naturalW} height={naturalH} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
                     {(() => {
-                        // Mapa rápido id->PlacedNode
-                        const byId = new Map<string, PlacedNode>();
-                        placed.forEach(p => byId.set(p.id, p));
+                        const map = new Map<string, PlacedNode>();
+                        placed.forEach((p) => map.set(p.id, p));
 
-                        // Agrupar hijos por padre
+                        const cy = new Map<string, number>();
+                        placed.forEach((p) => cy.set(p.id, Math.round(p.y + NODE_SIZE / 2)));
+
                         const childrenByParent = new Map<string, PlacedNode[]>();
-                        Object.values(entities).forEach(n => {
-                            const parent = byId.get(n.id)!;
-                            const kids = n.childrenIds.map(cid => byId.get(cid)!).filter(Boolean) as PlacedNode[];
-                            if (kids.length) childrenByParent.set(n.id, kids);
+                        Object.values(entities).forEach((n) => {
+                            const arr = n.childrenIds.map((id) => map.get(id)!).filter(Boolean) as PlacedNode[];
+                            if (arr.length) childrenByParent.set(n.id, arr);
                         });
 
-                        // Dibujo por grupo (padre -> hijos)
-                        const polylines: JSX.Element[] = [];
-                        let i = 0;
+                        const lines: JSX.Element[] = [];
+                        let k = 0;
+                        const EPS = 2;
 
-                        childrenByParent.forEach((kids, parentId) => {
-                            const A = byId.get(parentId)!;
+                        childrenByParent.forEach((kids, pid) => {
+                            const A = map.get(pid)!;
+                            const parentRightX = A.x + NODE_SIZE;
+                            const parentCY = cy.get(pid)!;
 
-                            const parentRightX  = A.x + NODE_SIZE;
-                            const parentCenterY = A.y + NODE_SIZE / 2;
-
-                            // rail X: a ~55% del gap hacia la columna hija (pegadito al hijo, pero constante por columna)
-                            const railX = A.x + H_GAP * 0.55;
-
-                            // ordenar hijos por Y y calcular junction en el punto medio entre el top y bottom
-                            const centersY = kids.map(k => k.y + NODE_SIZE / 2).sort((a,b)=>a-b);
-                            const topY = centersY[0];
-                            const botY = centersY[centersY.length - 1];
-                            const junctionY = (topY + botY) / 2;
-
-                            // Para cada hijo, ruta: padre → rail (Y padre) → junction → Y hijo → hijo
-                            kids.forEach(B => {
-                                const childLeftX   = B.x;
-                                const childCenterY = B.y + NODE_SIZE / 2;
-
-                                const points = [
-                                    `${parentRightX},${parentCenterY}`,
-                                    `${railX},${parentCenterY}`,
-                                    `${railX},${junctionY}`,
-                                    `${railX},${childCenterY}`,
-                                    `${childLeftX},${childCenterY}`,
-                                ].join(' ');
-
-                                polylines.push(
+                            // Un solo hijo → línea directa
+                            if (kids.length === 1) {
+                                const B = kids[0];
+                                const childCY = cy.get(B.id)!;
+                                const y = Math.abs(childCY - parentCY) <= EPS ? parentCY : childCY;
+                                lines.push(
                                     <polyline
-                                        key={`e-${parentId}-${B.id}-${i++}`}
-                                        points={points}
+                                        key={`direct-${pid}-${B.id}-${k++}`}
+                                        points={`${parentRightX},${y} ${B.x},${y}`}
                                         fill="none"
                                         stroke="white"
-                                        strokeOpacity={0.85}
+                                        strokeOpacity={0.9}
+                                        strokeWidth={3}
+                                        strokeLinejoin="round"
+                                        strokeLinecap="round"
+                                    />
+                                );
+                                return;
+                            }
+
+                            // Rail
+                            const nearestChildLeft = Math.min(...kids.map((c) => c.x));
+                            const centerGapX = A.x + NODE_SIZE + (H_GAP - NODE_SIZE) / 2;
+                            const railMin = A.x + NODE_SIZE + 8;
+                            const railMax = nearestChildLeft - 12;
+                            const railX = Math.max(railMin, Math.min(centerGapX, railMax));
+
+                            const childCYs = kids.map((c) => cy.get(c.id)!);
+                            const topY = Math.min(...childCYs);
+                            const botY = Math.max(...childCYs);
+
+                            const alignedY = childCYs.find((y) => Math.abs(y - parentCY) <= EPS);
+                            const yParentToRail = alignedY ?? parentCY;
+
+                            lines.push(
+                                <polyline
+                                    key={`pr-${pid}-${k++}`}
+                                    points={`${parentRightX},${yParentToRail} ${railX},${yParentToRail}`}
+                                    fill="none"
+                                    stroke="white"
+                                    strokeOpacity={0.9}
+                                    strokeWidth={3}
+                                    strokeLinejoin="round"
+                                    strokeLinecap="round"
+                                />
+                            );
+
+                            lines.push(
+                                <polyline
+                                    key={`rv-${pid}-${k++}`}
+                                    points={`${railX},${topY} ${railX},${botY}`}
+                                    fill="none"
+                                    stroke="white"
+                                    strokeOpacity={0.9}
+                                    strokeWidth={3}
+                                    strokeLinejoin="round"
+                                    strokeLinecap="round"
+                                />
+                            );
+
+                            kids.forEach((B) => {
+                                const cY = cy.get(B.id)!;
+                                const y = Math.abs(cY - parentCY) <= EPS ? yParentToRail : cY;
+                                lines.push(
+                                    <polyline
+                                        key={`rh-${pid}-${B.id}-${k++}`}
+                                        points={`${railX},${y} ${B.x},${y}`}
+                                        fill="none"
+                                        stroke="white"
+                                        strokeOpacity={0.9}
                                         strokeWidth={3}
                                         strokeLinejoin="round"
                                         strokeLinecap="round"
@@ -202,43 +375,45 @@ export default function SkillTree() {
                             });
                         });
 
-                        return polylines;
+                        return lines;
                     })()}
                 </svg>
 
+                {/* Nodos */}
                 {placed.map((n) => {
-                    const locked = !n.isUnlocked;
                     const done = n.isCompleted;
                     return (
                         <button
                             key={n.id}
-                            onClick={() => dispatch(tryToggleNode(n.id))}
+                            onClick={() => {
+                                // Solo permite marcar si NO está completado y está desbloqueado
+                                if (n.isCompleted) return;
+                                if (!n.isUnlocked) return;
+                                dispatch(tryToggleNode(n.id));
+                            }}
                             onMouseEnter={() => setHoverId(n.id)}
                             onMouseLeave={() => setHoverId(null)}
-                            title={n.name}
-                            disabled={locked}
                             style={{
                                 position: 'absolute',
                                 left: n.x,
                                 top: n.y,
                                 width: NODE_SIZE,
                                 height: NODE_SIZE,
-                                borderRadius: 6,
                                 border: '3px solid',
-                                borderColor: done ? '#c78a00' : locked ? '#777' : '#fff',
-                                background: done ? 'rgba(199,138,0)' : 'rgba(255,255,255)',
+                                borderColor: '#000000',
+                                boxShadow: '1px 2px 1px 1px #000000',
+                                background: done ? 'rgba(172, 124, 12)' : 'rgba(196, 196, 196)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                /*cursor: locked ? 'not-allowed' : 'pointer',*/
                             }}
                         >
                             <img
                                 src={n.image}
                                 alt={n.name}
                                 style={{
-                                    width: NODE_SIZE - 10,
-                                    height: NODE_SIZE - 10,
+                                    width: NODE_SIZE - 20,
+                                    height: NODE_SIZE - 20,
                                     objectFit: 'contain',
                                     imageRendering: 'pixelated',
                                     pointerEvents: 'none',
@@ -248,26 +423,50 @@ export default function SkillTree() {
                     );
                 })}
 
-                {hovered && (
+                {/* Tooltip en portal (no se recorta por overflow) */}
+                {hovered && tooltipScreenPos && createPortal(
                     <div
                         style={{
-                            position: 'absolute',
-                            left: Math.min(hovered.x + NODE_SIZE + 12, naturalW - 240),
-                            top: Math.max(hovered.y - 8, 8),
-                            width: 220,
-                            background: 'linear-gradient(180deg, #08a 0%, #016 100%)',
-                            color: '#fff',
+                            position: 'fixed',
+                            left: tooltipScreenPos.left,
+                            top: tooltipScreenPos.top,
+                            width: 240,
                             borderRadius: 6,
-                            padding: '10px 12px',
-                            boxShadow: '0 10px 24px rgba(0,0,0,0.4)',
-                            border: '2px solid rgba(0,0,0,0.6)',
+                            overflow: 'hidden',
+                            border: '2px solid rgba(0,0,0,0.65)',
+                            boxShadow: '3px 3px 0 rgba(0,0,0,0.9)',
+                            background: '#0f0f0f',
                             pointerEvents: 'none',
-                            zIndex: 10,
+                            zIndex: 9999,
                         }}
                     >
-                        <div style={{ fontWeight: 800, marginBottom: 6 }}>{hovered.name}</div>
-                        <div style={{ fontSize: 13, color: '#90ff90' }}>{hovered.description}</div>
-                    </div>
+                        <div
+                            style={{
+                                background: 'linear-gradient(180deg, #078bb5 0%, #045a7a 100%)',
+                                color: '#ffffff',
+                                fontWeight: 800,
+                                padding: '8px 10px',
+                                borderBottom: '2px solid rgba(0,0,0,0.45)',
+                                letterSpacing: '0.2px',
+                                textShadow: '0 1px 0 rgba(0,0,0,0.4)',
+                            }}
+                        >
+                            {hovered.name}
+                        </div>
+                        <div
+                            style={{
+                                padding: '10px',
+                                background: '#101010',
+                                color: '#39ff4a',
+                                fontSize: 14,
+                                lineHeight: 1.25,
+                                textShadow: '0 1px 0 rgba(0,0,0,0.6)',
+                            }}
+                        >
+                            {hovered.description}
+                        </div>
+                    </div>,
+                    document.body
                 )}
             </div>
         </div>

@@ -1,0 +1,132 @@
+{
+  "name": "CaptaCraft",
+  "description": "Árbol de logros alterno para pruebas",
+  "image": "https://minecraft.capta.co/Images/Grass.webp",
+  "children": [
+    {
+      "name": "Herrería",
+      "description": "Comienza con herramientas básicas",
+      "image": "https://minecraft.capta.co/Images/Wooden_Pickaxe.webp",
+      "children": [
+        {
+          "name": "Minería",
+          "description": "Consigue piedra para mejorar",
+          "image": "https://minecraft.capta.co/Images/Stone_Pickaxe.webp",
+          "children": [
+            {
+              "name": "Fundición",
+              "description": "Funde un lingote de hierro",
+              "image": "https://minecraft.capta.co/Images/Iron_Ingot.webp",
+              "children": [
+                {
+                  "name": "Armadura de hierro",
+                  "description": "Equípate con una pieza de hierro",
+                  "image": "https://minecraft.capta.co/Images/Iron_Chestplate.webp",
+                  "children": []
+                },
+                {
+                  "name": "Cubo de lava",
+                  "description": "Llena un cubo con lava",
+                  "image": "https://minecraft.capta.co/Images/Lava_Bucket.webp",
+                  "children": [
+                    {
+                      "name": "Obsidiana",
+                      "description": "Consigue un bloque de obsidiana",
+                      "image": "https://minecraft.capta.co/Images/Obsidian.webp",
+                      "children": [
+                        {
+                          "name": "Portal del Nether",
+                          "description": "Construye y activa un portal",
+                          "image": "https://minecraft.capta.co/Images/Flint_and_Steel.webp",
+                          "children": [
+                            {
+                              "name": "Manzana dorada",
+                              "description": "Cura a un aldeano zombi",
+                              "image": "https://minecraft.capta.co/Images/Golden_Apple.webp",
+                              "children": []
+                            },
+                            {
+                              "name": "Ojo de Ender",
+                              "description": "Sigue un ojo de ender",
+                              "image": "https://minecraft.capta.co/Images/Eye_of_Ender.webp",
+                              "children": [
+                                {
+                                  "name": "El End",
+                                  "description": "Atraviesa el portal del End",
+                                  "image": "https://minecraft.capta.co/Images/End_Stone.webp",
+                                  "children": []
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "Pico de hierro",
+                  "description": "Mejora tu pico",
+                  "image": "https://minecraft.capta.co/Images/Iron_Pickaxe.webp",
+                  "children": [
+                    {
+                      "name": "Diamantes",
+                      "description": "Consigue un diamante",
+                      "image": "https://minecraft.capta.co/Images/Diamond.webp",
+                      "children": [
+                        {
+                          "name": "Peto de diamante",
+                          "description": "La armadura de diamante salva vidas",
+                          "image": "https://minecraft.capta.co/Images/Diamond_Chestplate.webp",
+                          "children": []
+                        },
+                        {
+                          "name": "Encantamientos",
+                          "description": "Encanta un objeto",
+                          "image": "https://minecraft.capta.co/Images/Enchanted_Book.webp",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Agricultura",
+      "description": "Planta y cosecha tus primeros cultivos",
+      "image": "https://minecraft.capta.co/Images/Golden_Apple.webp",
+      "children": [
+        {
+          "name": "Riego",
+          "description": "Usa agua para acelerar cultivos",
+          "image": "https://minecraft.capta.co/Images/Lava_Bucket.webp",
+          "children": []
+        },
+        {
+          "name": "Compost",
+          "description": "Crea abono para mejorar el suelo",
+          "image": "https://minecraft.capta.co/Images/Obsidian.webp",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "Exploración",
+      "description": "Viaja y descubre biomas",
+      "image": "https://minecraft.capta.co/Images/Shield.webp",
+      "children": [
+        {
+          "name": "Mapa",
+          "description": "Crea un mapa para orientarte",
+          "image": "https://minecraft.capta.co/Images/Eye_of_Ender.webp",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

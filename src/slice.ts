@@ -1,5 +1,8 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export const DEFAULT_SOURCE_URL = 'https://minecraft.capta.co/BaseSkillTree.json';
+/*export const DEFAULT_SOURCE_URL = '/test/TestSkillTree.json';*/
+
 interface RawNode {
     name: string;
     description: string;
@@ -21,49 +24,28 @@ export interface SliceState {
     status: 'idle' | 'loading' | 'succeeded' | 'failed';
     error?: string | null;
     sourceUrl: string;
-
-    // progreso:
     completed: Record<string, boolean>;
 }
 
 // --- Normalizador ---
 function normalizeTree(root: RawNode) {
     const entities: Record<string, SkillNode> = {};
-
     const walk = (node: RawNode, path: string): string => {
         const id = path;
         const childrenIds = node.children.map((child, index) =>
             walk(child, path ? `${path}/${index}` : `${index}`)
         );
-        entities[id] = {
-            id,
-            name: node.name,
-            description: node.description,
-            image: node.image,
-            childrenIds,
-        };
+        entities[id] = { id, name: node.name, description: node.description, image: node.image, childrenIds };
         return id;
     };
-
     const rootId = walk(root, '0');
     return { entities, rootId };
 }
 
-// --- Helpers (dep/parents/descendants) ---
+// --- Helpers ---
 const getParentId = (id: string): string | null => {
     const last = id.lastIndexOf('/');
-    if (last === -1) return null;
-    return id.slice(0, last);
-};
-
-const collectDescendants = (entities: Record<string, SkillNode>, id: string, acc: string[] = []) => {
-    const node = entities[id];
-    if (!node) return acc;
-    for (const cid of node.childrenIds) {
-        acc.push(cid);
-        collectDescendants(entities, cid, acc);
-    }
-    return acc;
+    return last === -1 ? null : id.slice(0, last);
 };
 
 // --- Thunk para descargar y normalizar ---
@@ -83,7 +65,7 @@ const initialState: SliceState = {
     rootId: null,
     status: 'idle',
     error: null,
-    sourceUrl: 'https://minecraft.capta.co/BaseSkillTree.json',
+    sourceUrl: DEFAULT_SOURCE_URL,
     completed: {},
 };
 
@@ -95,30 +77,17 @@ export const slice = createSlice({
             state.sourceUrl = action.payload;
         },
 
-        // Intenta alternar el estado del nodo cumpliendo la regla:
-        // - Sólo puedes completar si el padre está completado (o es raíz).
-        // - Si desmarcas, se desmarcan todos sus descendientes.
+        // (si aún quieres impedir deseleccionar, deja esto así:)
         tryToggleNode(state, action: PayloadAction<string>) {
             const id = action.payload;
-            const isCompleted = !!state.completed[id];
+            // no permitir desmarcar si ya está completado
+            if (state.completed[id]) return;
 
-            if (isCompleted) {
-                // Un-complete y cascada hacia abajo
-                state.completed[id] = false;
-                const desc = collectDescendants(state.entities, id);
-                for (const d of desc) state.completed[d] = false;
-                return;
-            }
-
-            // Intento de completar: validar padre
             const parentId = getParentId(id);
-            if (parentId === null || state.completed[parentId]) {
-                state.completed[id] = true;
-            }
-            // Si no cumple, no hace nada (UI puede mostrar feedback/tooltip si quieres)
+            const canComplete = parentId === null || !!state.completed[parentId];
+            if (canComplete) state.completed[id] = true;
         },
 
-        // util por si quieres limpiar progreso al cambiar de URL
         resetProgress(state) {
             state.completed = {};
         },
@@ -133,8 +102,8 @@ export const slice = createSlice({
                 state.status = 'succeeded';
                 state.entities = action.payload.entities;
                 state.rootId = action.payload.rootId;
-                state.sourceUrl = action.payload.sourceUrl;
-                state.completed = {}; // al cargar otro árbol, limpiar progreso
+                state.sourceUrl = action.payload.sourceUrl; // refleja la última
+                state.completed = {};
             })
             .addCase(fetchSkillTree.rejected, (state, action) => {
                 state.status = 'failed';

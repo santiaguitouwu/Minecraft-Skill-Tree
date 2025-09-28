@@ -25,15 +25,17 @@
 }
 
 .container {
-    min-width: calc(min(80vw, 800px) - 40px);
-    min-height: min(80vh, 400px);
+    position: relative;                           /* <-- para que el hijo absoluto se ancle aquí */
+    width: calc(min(80vw, 800px) - 40px);         /* usar width, no min-width */
+    height: min(80vh, 400px);                     /* usar height, no min-height */
+
     display: flex;
     align-items: center;
     justify-content: center;
+
     box-shadow:
-        -5px -5px 4px 0px rgba(0, 0, 0, 0.5) inset,
-        5px 5px 5px 0px rgba(0, 0, 0, 0.5) inset;
-    background: url('/background.png')
-        lightgray 50% / cover;
-        background-color: brown;
+            -5px -5px 4px 0px rgba(0, 0, 0, 0.5) inset,
+            5px  5px 5px 0px rgba(0, 0, 0, 0.5) inset;
+
+    background: url('/background.png') lightgray 50% / cover;
 }
