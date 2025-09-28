@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 export const DEFAULT_SOURCE_URL = 'https://minecraft.capta.co/BaseSkillTree.json';
-/*export const DEFAULT_SOURCE_URL = '/test/TestSkillTree.json';*/
+/*export const DEFAULT_SOURCE_URL = '/test/TestSkillTree_01.json';*/
 
 interface RawNode {
     name: string;

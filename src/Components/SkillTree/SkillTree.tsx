@@ -31,7 +31,7 @@ export default function SkillTree() {
         if (sourceUrl) dispatch(fetchSkillTree(sourceUrl));
     }, [dispatch, sourceUrl]);
 
-    const { placed, edges, naturalW, naturalH } =
+    const { placed, naturalW, naturalH } =
         useSkillLayout(entities, rootId, completed);
 
     // refs/estado de UI
