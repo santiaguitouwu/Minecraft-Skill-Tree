@@ -9,7 +9,7 @@ type Props = {
 };
 
 export default function NodeButton({
-                                       x, y, image, name, isCompleted, isUnlocked, onClick, onEnter, onLeave,
+                                       x, y, image, name, isCompleted, onClick, onEnter, onLeave,
                                    }: Props) {
     return (
         <button
