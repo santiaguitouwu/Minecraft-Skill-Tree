@@ -28,19 +28,17 @@ export default function SkillTree() {
 
     // Cargar árbol desde la URL guardada en Redux
     useEffect(() => {
-        if (sourceUrl) dispatch(fetchSkillTree(sourceUrl));
+        if (sourceUrl) void dispatch(fetchSkillTree(sourceUrl));
     }, [dispatch, sourceUrl]);
 
     const { placed, naturalW, naturalH } =
         useSkillLayout(entities, rootId, completed);
 
-    // refs/estado de UI
     const hostRef  = useRef<HTMLDivElement>(null);
     const stageRef = useRef<HTMLDivElement>(null);
     const [hoverId, setHoverId] = useState<string | null>(null);
     const hovered = hoverId ? placed.find(p => p.id === hoverId) : null;
 
-    // medir contenedor para decidir si se puede hacer pan y para el cursor
     const [hostSize, setHostSize] = useState({ w: 0, h: 0 });
     useEffect(() => {
         if (!hostRef.current) return;
@@ -53,7 +51,6 @@ export default function SkillTree() {
     }, []);
     const canPan = naturalW > hostSize.w || naturalH > hostSize.h;
 
-    // posicionar tooltip en viewport (usa portal -> no se recorta)
     const tooltipPos = useMemo(() => {
         if (!hovered || !stageRef.current) return null;
         const r = stageRef.current.getBoundingClientRect();
@@ -86,7 +83,6 @@ export default function SkillTree() {
         return { left, top };
     }, [hovered]);
 
-    // pan con pointer events (solo si canPan)
     const isPanningRef = useRef(false);
     const lastRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -115,7 +111,6 @@ export default function SkillTree() {
         (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     };
 
-    // estados de carga/errores
     if (status === 'loading') return <p style={{ color: '#ccc' }}>Cargando árbol…</p>;
     if (status === 'failed')   return <p style={{ color: 'tomato' }}>Error: {error}</p>;
     if (!rootId)               return null;
@@ -137,7 +132,7 @@ export default function SkillTree() {
             >
                 <EdgesLayer
                     placed={placed}
-                    edges={[]}                // no lo usamos dentro (agrupa por padre directo desde entities)
+                    edges={[]}
                     entities={entities}
                     width={naturalW}
                     height={naturalH}
@@ -155,7 +150,6 @@ export default function SkillTree() {
                         onEnter={() => setHoverId(n.id)}
                         onLeave={() => setHoverId(null)}
                         onClick={() => {
-                            // bloquear des-selección; solo marcar si está desbloqueado
                             if (n.isCompleted) return;
                             if (!n.isUnlocked) return;
                             dispatch(tryToggleNode(n.id));
