@@ -9,8 +9,7 @@ type Props = {
 };
 
 export default function NodeButton({
-                                       x, y, image, name, isCompleted, onClick, onEnter, onLeave,
-                                   }: Props) {
+                                       x, y, image, name, isCompleted, onClick, onEnter, onLeave,}: Props) {
     return (
         <button
             onClick={onClick}

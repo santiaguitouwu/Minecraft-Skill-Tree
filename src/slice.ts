@@ -25,7 +25,7 @@ export interface SliceState {
     completed: Record<string, boolean>;
 }
 
-// --- Normalizador ---
+//Normalizador
 function normalizeTree(root: RawNode) {
     const entities: Record<string, SkillNode> = {};
     const walk = (node: RawNode, path: string): string => {
@@ -40,13 +40,13 @@ function normalizeTree(root: RawNode) {
     return { entities, rootId };
 }
 
-// --- Helpers ---
+//Helpers
 const getParentId = (id: string): string | null => {
     const last = id.lastIndexOf('/');
     return last === -1 ? null : id.slice(0, last);
 };
 
-// --- Thunk para descargar y normalizar ---
+// Thunk para descargar y normalizar
 export const fetchSkillTree = createAsyncThunk<
     { entities: Record<string, SkillNode>; rootId: string; sourceUrl: string },
     string
@@ -112,7 +112,7 @@ export const slice = createSlice({
 
 export const { setSourceUrl, tryToggleNode, resetProgress } = slice.actions;
 
-// Selectores
+//Selectores
 export const selectStatus = (s: { entities: SliceState }) => s.entities.status;
 export const selectError = (s: { entities: SliceState }) => s.entities.error;
 export const selectSourceUrl = (s: { entities: SliceState }) => s.entities.sourceUrl;
