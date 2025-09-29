@@ -18,3 +18,16 @@ Este proyecto es una réplica del Árbol de Logros de Minecraft. La aplicación 
     ```
 3. **Acceder a la aplicación**:
    Una vez que el servidor esté en funcionamiento, abre tu navegador y ve a `http://localhost:3000` para ver la aplicación en acción.
+
+## Configuración de la URL del Árbol de Logros
+Por defecto, la aplicación carga los logros desde:
+
+```bash
+    https://minecraft.capta.co/BaseSkillTree.json
+```
+
+Si deseas cambiar la URL de donde se descargan los logros, debes crear o editar un archivo .env en la raíz del proyecto y añadir la siguiente variable:
+
+```bash
+    VITE_SKILLTREE_URL=https://tuservidor.com/mis-logros.json
+```
